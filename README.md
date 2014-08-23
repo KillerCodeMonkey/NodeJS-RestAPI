@@ -1,4 +1,4 @@
-RestAPI [![Build Status](https://travis-ci.org/KillerCodeMonkey/restAPI.svg?branch=master)](https://travis-ci.org/KillerCodeMonkey/restAPI)
+RestAPI [![Build Status](https://travis-ci.org/KillerCodeMonkey/restAPI.svg?branch=master)](https://travis-ci.org/KillerCodeMonkey/NodeJS-RestAPI)
 ================
 NodeJS/MongoDB REST-API with token authentication and multidb support
 

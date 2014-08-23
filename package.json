@@ -4,7 +4,7 @@
     "author": "Bengt Weiße <bengtler@gmail.com>",
     "repository": {
         "type": "git",
-        "url": "https://github.com/KillerCodeMonkey/restAPI"
+        "url": "https://github.com/KillerCodeMonkey/NodeJS-RestAPI"
     },
     "keywords": [
         "nodejs",
