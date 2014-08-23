@@ -1,0 +1,262 @@
+/** @file client.js Endpoints for client requests
+ *  @module Client
+ * */
+define([
+    'appConfig',
+    'databaseConfig',
+    'util/system',
+    'mkdirp',
+    'underscore',
+    'mongoose'
+], /** @lends Client */ function (appConfig, dbConfig, system, mkdirp, _, mongoose) {
+    'use strict';
+
+    var rest = {};
+
+    /**
+     * @function create
+     * @description Creates client
+     * @property /api/[version]/[systemdb]/client - url
+     * @property {POST} Method - request method
+     * @property Authorization - set request header Authorization: TOKENTYPE ACCESSTOKEN
+     * @property Permissions - SystemAdmin
+     * @param {string} host - db hostname (optional)
+     * @param {string} port - db port (optional)
+     * @param {string} user - db username (optional)
+     * @param {string} password - db password (optional)
+     * @return {string} _id - client id
+     * @return {string} name - client name
+     * @return {string} alias - db alias
+     * @return {boolean} active - client status
+     * @throws 400 'missing_client_alias' - if dbname/client alias missing
+     * @throws 400 'client_alias_longer_64_cars' - if dbname/client alias longer then 64 chars
+     * @throws 400 'client_already_exists' - if dbname already exists / client with this alias already exists
+     * @throws 400 'client_not_created' - if there was a error during creation (saving to db, saving to client file)
+     */
+    rest.create = {
+        permissions: [appConfig.permissions.sysadmin],
+        models: ['client'],
+        exec: function (req, res, Client) {
+            var dbname = req.body.alias,
+                name = req.body.name,
+                host = req.body.host,
+                port = req.body.port,
+                user = req.body.user,
+                password = req.body.password,
+                client;
+
+            if (!dbname && !name) {
+                return res.send(400, {
+                    error: 'missing_name_or_alias'
+                });
+            }
+
+            Client.count({
+                alias: dbname
+            }, function (err, count) {
+                if (err) {
+                    return res.send(500, {
+                        error: err
+                    });
+                }
+                if (count) {
+                    return res.send(400, {
+                        error: 'db_already_exists'
+                    });
+                }
+
+                client = new Client({
+                    name: name,
+                    alias: dbname,
+                    host: host,
+                    port: port,
+                    user: user,
+                    password: password
+                });
+                client.save(function (err, newClient) {
+                    if (err) {
+                        return res.send(500, {
+                            error: err
+                        });
+                    }
+                    mkdirp.sync('static/public/' + dbname + '/');
+
+                    res.send(newClient.toObject());
+                });
+            });
+        }
+    };
+
+    /**
+     * @function set
+     * @description Updates a client
+     * @property /api/[version]/[systemdb]/client/id/[clientID] - url
+     * @property {PUT} Method - request method
+     * @property Authorization - set request header Authorization: TOKENTYPE ACCESSTOKEN
+     * @property Permissions - SystemAdmin
+     * @param {boolean} active - activate/deactivate client (optional)
+     * @param {string} host - db hostname (optional)
+     * @param {string} port - db port (optional)
+     * @param {string} user - db username (optional)
+     * @param {string} password - db password (optional)
+     * @return {string} _id - client id
+     * @return {string} name - client name
+     * @return {string} alias - db alias
+     * @return {boolean} active - client status
+     * @throws 400 'client_not_updated' - if saving data to db or to client file fails
+     */
+    rest.set = {
+        permissions: [appConfig.permissions.sysadmin],
+        exec: function (req, res) {
+            var client = req.object,
+                params = {
+                    host: req.body.host || client.host,
+                    name: req.body.name || client.name,
+                    port: req.body.port || client.port,
+                    user: req.body.user || client.user,
+                    password: req.body.password || client.password,
+                    active: req.body.active !== undefined ? req.body.active : client.active
+                };
+
+            _.extend(client, params);
+            client.save(function (err, updatedClient) {
+                if (err) {
+                    return res.send(500, {
+                        error: err
+                    });
+                }
+                res.send(updatedClient.toObject());
+            });
+        }
+    };
+
+    /**
+     * @function getAll
+     * @description Gets all clients
+     * @property /api/[version]/[systemdb]/client - url
+     * @property {GET} Method - request method
+     * @property Authorization - set request header Authorization: TOKENTYPE ACCESSTOKEN
+     * @property Permissions - SystemAdmin
+     * @return {array} clients - array of objects of all clients
+     * @throws 400 'can_not_get_clients' - can not load clients
+     */
+    rest.getAll = {
+        permissions: [appConfig.permissions.sysadmin],
+        models: ['client'],
+        exec: function (req, res, Client) {
+            Client.find().sort('_id').lean().exec(function (err, clients) {
+                if (err) {
+                    return res.send(500, {
+                        error: err
+                    });
+                }
+                res.send(clients);
+            });
+        }
+    };
+
+    /**
+     * @function active
+     * @description Gets all clients
+     * @property /api/[version]/[systemdb]/client/active - url
+     * @property {GET} Method - request method
+     * @property Authorization - set request header Authorization: TOKENTYPE ACCESSTOKEN
+     * @return {array} clients - array of objects of all clients
+     */
+    rest.active = {
+        permissions: [],
+        models: ['client'],
+        exec: function (req, res, Client) {
+            Client.find({
+                active: true
+            }).lean().exec(function (err, clients) {
+                if (err) {
+                    return res.send(500, {
+                        error: err
+                    });
+                }
+                res.send(clients);
+            });
+        }
+    };
+
+    /**
+     * @function get
+     * @description Gets a client
+     * @property /api/[version]/[systemdb]/client/id/[clientID] - url
+     * @property {GET} Method - request method
+     * @property Authorization - set request header Authorization: TOKENTYPE ACCESSTOKEN
+     * @property Permissions - SystemAdmin
+     * @return {object} client - client object
+     */
+    rest.get = {
+        permissions: [appConfig.permissions.sysadmin],
+        exec: function (req, res) {
+            res.send(req.object.toObject());
+        }
+    };
+
+    /**
+     * @function remove
+     * @description Removes a client
+     * @property /api/[version]/[systemdb]/client/id/[clientID] - url
+     * @property {DELETE} Method - request method
+     * @property Authorization - set request header Authorization: TOKENTYPE ACCESSTOKEN
+     * @property Permissions - SystemAdmin
+     */
+    rest.remove = {
+        permissions: [appConfig.permissions.sysadmin],
+        exec: function (req, res) {
+            var client = req.object;
+
+            client.remove(function (err) {
+                if (err) {
+                    return res.send(500, {
+                        error: err
+                    });
+                }
+                // clear all collections of client db
+                var opt = {
+                    user: dbConfig.admin,
+                    pass: dbConfig.adminpassword,
+                    auth: {
+                        authdb: dbConfig.authdb
+                    }
+                };
+                var connection = mongoose.createConnection(dbConfig.host, client.alias, dbConfig.port, opt);
+                connection.on('open', function () {
+                    connection.db.dropDatabase(function () {
+                        connection.close();
+                        system.deleteStaticFilesRecursive(process.cwd() + '/static/public/' + client.alias);
+                        res.send();
+                    });
+                });
+            });
+        }
+    };
+
+    return {
+        v1: {
+            post : {
+                // Creates a new client/db
+                '': rest.create
+            },
+            put: {
+                // Updates a client/db
+                'object': rest.set
+            },
+            get: {
+                // Gets all db/clients
+                '': rest.getAll,
+                // Gets one client
+                'object': rest.get,
+                //get all active clients
+                'active': rest.active
+            },
+            'delete': {
+                // Removes a client
+                'object': rest.remove
+            }
+        }
+    };
+});
